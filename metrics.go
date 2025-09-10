@@ -28,6 +28,14 @@ func ParseTime(ts any) (time.Time, error) {
 			return time.Time{}, err
 		}
 		return t, nil
+	case float64:
+		sec := int64(v)
+		nsecFloat := v - float64(sec)
+		nsec := int64(nsecFloat * 1e9)
+		return time.Unix(sec, nsec), nil
+	case int64:
+		seconds := v
+		return time.Unix(seconds, 0), nil
 	default:
 		return time.Time{}, fmt.Errorf("unsupported timestamp type: %T", ts)
 	}

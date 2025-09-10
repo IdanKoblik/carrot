@@ -4,16 +4,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
+	"github.com/charmbracelet/log"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 )
 
+var Log *log.Logger
+
 func main() {
+	Log = log.NewWithOptions(os.Stderr, log.Options{
+		ReportCaller:    true,
+		ReportTimestamp: true,
+		TimeFormat:      time.Kitchen,
+		Prefix:          "Carrot 🥕 ",
+	})
+
 	configPath := os.Getenv("CONFIG_PATH")	
 	if configPath == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to get working directory: %v\n", err)
+			Log.Error("Failed to get working directory", "err", err)
 			os.Exit(1)
 		}
 
@@ -22,7 +34,7 @@ func main() {
 
 	cfg, err := ReadConfig(configPath)
 	if err != nil {
-		fmt.Printf("Cannot read config file:\n%v\n", err)
+		Log.Error("Cannot read config file", "err", err)
 		return
 	}
 
@@ -31,24 +43,31 @@ func main() {
 
 	msgs, err := ConsumeMessages(cfg)
 	if err != nil {
-		fmt.Printf("Cannot consume messages from rabbitmq:\n%v\n", err)
+		Log.Error("Cannot consume messages from rabbitmq", "err", err)
 		return 
 	}
 
-	fmt.Printf("Waiting for messages...\n")
+	Log.Info("Waiting for messages...")
 	for msg := range msgs {
-		fmt.Printf("Received: %s\n", msg.Body)
+		unquoted, err := strconv.Unquote(`"` + string(msg.Body) + `"`)
+    	if err != nil {
+        fmt.Println("Error:", err)
+        return
+    	}
+
+		Log.Info("Received! ", "body", unquoted)
 		metric, err := ConsumeMessage(msg.Body)
 		if err != nil {
-			fmt.Printf("Cannot consume rabbit msg:\n%v\n", err)
+			Log.Error("Cannot consume rabbit msg", "err", err)
 			continue
 		}
 
 		if err := SendMetric(writeAPI, metric); err != nil {
-			fmt.Printf("Cannot send metric to influxdb:\n%v\n", err)	
+			Log.Error("Cannot send metric to influxdb", "err", err)
 			continue
 		}
 
+		Log.Info("Send new metric to influxdb")
 		msg.Ack(false)
 	}
 }
