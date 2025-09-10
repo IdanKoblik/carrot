@@ -51,7 +51,7 @@ func main() {
 	for msg := range msgs {
 		unquoted, err := strconv.Unquote(`"` + string(msg.Body) + `"`)
     	if err != nil {
-        fmt.Println("Error:", err)
+        Log.Error("Cannot stringify the json", "err", err)
         return
     	}
 
