@@ -41,43 +41,47 @@ func ParseTime(ts any) (time.Time, error) {
 	}
 }
 
-func ConsumeMessage(data []byte) (*Metric, error) {
+func ConsumeMessage(data []byte) ([]*Metric, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, err
 	}
 
-	metric := &Metric{
-		Tags: make(map[string]string),
-	}
-
+	tags := make(map[string]string)
 	for k, v := range raw {
-		if strings.HasPrefix(k, "_") {
+		if k == "metrics" || strings.HasPrefix(k, "_") {
 			continue
 		}
 
-		if k == "metric" {
-			var temp RawMetric
-			if err := json.Unmarshal(v, &temp); err != nil {
-				return nil, err
-			}
-
-			t, err := ParseTime(temp.Timestamp)
-			if err != nil {
-				return nil, err
-			}
-
-			metric.Timestamp = t
-			metric.Name = temp.Name
-			metric.Value = temp.Value
-		} else {
-			var val string
-			if err := json.Unmarshal(v, &val); err != nil {
-				return nil, err
-			}
-			metric.Tags[k] = val
+		var val string
+		if err := json.Unmarshal(v, &val); err != nil {
+			return nil, fmt.Errorf("invalid tag value for key %s: %v", k, err)
 		}
+
+		tags[k] = val
 	}
 
-	return metric, nil
+	var rawMetrics []RawMetric
+	if err := json.Unmarshal(raw["metrics"], &rawMetrics); err != nil {
+		return nil, fmt.Errorf("invalid metrics array: %v", err)
+	}
+
+	var metrics []*Metric
+	for _, rawMetric := range rawMetrics {
+		t, err := ParseTime(rawMetric.Timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("invalid timestamp: %v", err)
+		}
+
+		metric := &Metric{
+			Name:      rawMetric.Name,
+			Value:     rawMetric.Value,
+			Timestamp: t,
+			Tags:      tags,
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	return metrics, nil
 }
