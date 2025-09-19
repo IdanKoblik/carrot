@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -49,13 +47,7 @@ func main() {
 
 	Log.Info("Waiting for messages...")
 	for msg := range msgs {
-		unquoted, err := strconv.Unquote(`"` + string(msg.Body) + `"`)
-    	if err != nil {
-        Log.Error("Cannot stringify the json", "err", err)
-        return
-    	}
-
-		Log.Info("Received! ", "body", unquoted)
+		Log.Info("Received! ", "body", string(msg.Body))
 		metric, err := ConsumeMessage(msg.Body)
 		if err != nil {
 			Log.Error("Cannot consume rabbit msg", "err", err)
